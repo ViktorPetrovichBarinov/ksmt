@@ -13,6 +13,7 @@ import io.ksmt.sort.KBoolSort
 import io.ksmt.sort.KIntSort
 import io.ksmt.sort.KSort
 import io.ksmt.sort.KStringSort
+import io.ksmt.utils.ArithUtils.bigIntegerValue
 import io.ksmt.utils.StringUtils
 import io.ksmt.utils.StringUtils.STRING_FROM_CODE_UPPER_BOUND
 
@@ -373,13 +374,9 @@ inline fun KContext.simplifyStringFromIntBasic(
     arg: KExpr<KIntSort>,
     cont: (KExpr<KIntSort>) -> KExpr<KStringSort>
 ): KExpr<KStringSort> {
-    val intValue = when (arg) {
-        is KInt32NumExpr -> arg.value.toLong()
-        is KInt64NumExpr -> arg.value
-        is KIntBigNumExpr -> arg.value.toLong()
-        else -> return cont(arg)
-    }
-    return mkStringLiteral(if (intValue >= 0) intValue.toString() else "")
+    val number = arg as? KIntNumExpr ?: return cont(arg)
+    val value = number.bigIntegerValue
+    return mkStringLiteral(if (value.signum() >= 0) value.toString() else "")
 }
 
 inline fun <K : KSort> tryEvalStringLiteralOperation(

@@ -174,8 +174,9 @@ object StringUtils {
     fun stringToInt(
         arg: KStringLiteralExpr
     ): KIntNumExpr = with(arg.ctx) {
-        return if (arg.value.isNotEmpty() && arg.value.all { it.isDigit() }) {
-            mkIntNum(arg.value.toLongOrNull() ?: -1)
+        val digits = arg.value
+        return if (digits.isNotEmpty() && digits.all { it in '0'..'9' }) {
+            mkIntNum(digits.toBigInteger())
         } else {
             mkIntNum(-1)
         }
