@@ -195,8 +195,8 @@ inline fun KContext.simplifyStringSingletonSubBasic(
             is KIntBigNumExpr -> arg1.value.toLong()
             else -> return cont(arg0, arg1)
         }
-        val result = if (pos <= Int.MAX_VALUE && pos >= 0 && pos < str.length) {
-            str[pos.toInt()].toString()
+        val result = if (pos in 0..Int.MAX_VALUE) {
+            StringUtils.charAtCodePoint(str, pos.toInt())
         } else {
             ""
         }
@@ -217,9 +217,8 @@ inline fun KContext.simplifyStringSubBasic(
         val str = arg0.value
         val startPos = arg1.toLongValue()
         val length = arg2.toLongValue()
-        val result = if (startPos in 0..Int.MAX_VALUE && length in 0..Int.MAX_VALUE && startPos < str.length) {
-            val endPos = minOf(startPos + length, str.length.toLong()).toInt()
-            str.substring(startPos.toInt(), endPos)
+        val result = if (startPos in 0..Int.MAX_VALUE && length in 0..Int.MAX_VALUE) {
+            StringUtils.substringByCodePoints(str, startPos.toInt(), length.toInt())
         } else {
             ""
         }
@@ -249,13 +248,8 @@ inline fun KContext.simplifyStringIndexOfBasic(
             return cont(arg0, arg1, arg2)
         }
 
-        val result = if (startPos >= 0 && startPos <= str.length) {
-            if (search.isEmpty()) {
-                startPos
-            } else {
-                val index = str.indexOf(search, startPos)
-                if (index >= 0) index else -1
-            }
+        val result = if (startPos >= 0) {
+            StringUtils.indexOfCodePoints(str, search, startPos)
         } else {
             -1
         }
@@ -356,7 +350,7 @@ inline fun KContext.simplifyStringFromCodeBasic(
     }
 
     return if (value in 0..STRING_FROM_CODE_UPPER_BOUND) {
-        mkStringLiteral(value.toInt().toChar().toString())
+        mkStringLiteral(StringUtils.codePointToString(value.toInt()))
     } else {
         mkStringLiteral("")
     }

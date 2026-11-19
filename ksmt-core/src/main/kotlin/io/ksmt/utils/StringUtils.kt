@@ -10,9 +10,62 @@ object StringUtils {
 
     const val STRING_FROM_CODE_UPPER_BOUND: Int = 196607
 
+    /** Singleton string for an SMT-LIB code point. Codes above U+FFFF need a surrogate pair. */
+    @JvmStatic
+    fun codePointToString(codePoint: Int): String =
+        String(Character.toChars(codePoint))
+
+    /** Unicode code points of [value]. A supplementary character is one point, not two UTF-16 units. */
+    @JvmStatic
+    fun codePoints(value: String): IntArray {
+        val points = IntArray(value.codePointCount(0, value.length))
+        var index = 0
+        var offset = 0
+        while (offset < value.length) {
+            val codePoint = value.codePointAt(offset)
+            points[index++] = codePoint
+            offset += Character.charCount(codePoint)
+        }
+        return points
+    }
+
     @JvmStatic
     fun getStringLen(arg: KStringLiteralExpr): KIntNumExpr = with(arg.ctx) {
-        mkIntNum(arg.value.length)
+        mkIntNum(arg.value.codePointCount(0, arg.value.length))
+    }
+
+    /** Character at a code-point index. An index outside the string yields the empty string. */
+    @JvmStatic
+    fun charAtCodePoint(value: String, index: Int): String {
+        if (index < 0 || index >= value.codePointCount(0, value.length)) return ""
+        val offset = value.offsetByCodePoints(0, index)
+        return codePointToString(value.codePointAt(offset))
+    }
+
+    /** Substring by code-point offset and length. Out of range yields the empty string. */
+    @JvmStatic
+    fun substringByCodePoints(value: String, start: Int, length: Int): String {
+        if (start < 0 || length < 0) return ""
+        val count = value.codePointCount(0, value.length)
+        if (start >= count) return ""
+        val end = minOf(start.toLong() + length.toLong(), count.toLong()).toInt()
+        val startOffset = value.offsetByCodePoints(0, start)
+        val endOffset = value.offsetByCodePoints(startOffset, end - start)
+        return value.substring(startOffset, endOffset)
+    }
+
+    /** First code-point index of [search] at or after [start], or -1. */
+    @JvmStatic
+    fun indexOfCodePoints(value: String, search: String, start: Int): Int {
+        val haystack = codePoints(value)
+        if (start < 0 || start > haystack.size) return -1
+        if (search.isEmpty()) return start
+        val needle = codePoints(search)
+        val last = haystack.size - needle.size
+        for (index in start..last) {
+            if (needle.indices.all { needle[it] == haystack[index + it] }) return index
+        }
+        return -1
     }
 
     @JvmStatic
@@ -97,7 +150,9 @@ object StringUtils {
     fun stringReverse(
         arg: KStringLiteralExpr
     ): KStringLiteralExpr = with(arg.ctx) {
-        mkStringLiteral(arg.value.reversed())
+        val points = codePoints(arg.value)
+        points.reverse()
+        mkStringLiteral(String(points, 0, points.size))
     }
 
     @JvmStatic
@@ -111,7 +166,8 @@ object StringUtils {
     fun stringToCode(
         arg: KStringLiteralExpr
     ): KIntNumExpr = with(arg.ctx) {
-        mkIntNum(arg.value.singleOrNull()?.code ?: -1)
+        val points = codePoints(arg.value)
+        mkIntNum(if (points.size == 1) points[0] else -1)
     }
 
     @JvmStatic

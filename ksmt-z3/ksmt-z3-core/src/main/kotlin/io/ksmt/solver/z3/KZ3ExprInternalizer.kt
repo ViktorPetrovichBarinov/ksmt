@@ -177,6 +177,7 @@ import io.ksmt.expr.KStringFromCodeExpr
 import io.ksmt.expr.KStringToIntExpr
 import io.ksmt.expr.KStringFromIntExpr
 import io.ksmt.expr.KStringLiteralExpr
+import io.ksmt.utils.StringUtils
 import io.ksmt.expr.KRegexConcatExpr
 import io.ksmt.expr.KRegexUnionExpr
 import io.ksmt.expr.KRegexIntersectionExpr
@@ -1026,7 +1027,16 @@ open class KZ3ExprInternalizer(
     }
 
     override fun transform(expr: KStringLiteralExpr) = with(expr) {
-        transform { Native.mkString(nCtx, value) }
+        transform {
+            // Native.mkString passes the Java string as modified UTF-8. That encoding
+            // drops U+0000, rejects surrogates, and splits a supplementary character.
+            if (value.all { it.code in 1..127 }) {
+                Native.mkString(nCtx, value)
+            } else {
+                val codePoints = StringUtils.codePoints(value)
+                Native.mkU32string(nCtx, codePoints.size, codePoints)
+            }
+        }
     }
 
     // regex
