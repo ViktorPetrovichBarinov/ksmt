@@ -159,7 +159,7 @@ object StringUtils {
     fun stringIsDigit(
         arg: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg.ctx) {
-        mkBool(arg.value.length == 1 && arg.value[0].isDigit()).uncheckedCast()
+        mkBool(arg.value.length == 1 && arg.value[0] in '0'..'9').uncheckedCast()
     }
     
     @JvmStatic
