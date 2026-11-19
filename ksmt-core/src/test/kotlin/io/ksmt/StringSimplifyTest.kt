@@ -3,6 +3,7 @@ package io.ksmt
 import io.ksmt.expr.KExpr
 import io.ksmt.sort.KSort
 import io.ksmt.sort.KStringSort
+import io.ksmt.utils.StringUtils.STRING_FROM_CODE_UPPER_BOUND
 import io.ksmt.utils.StringUtils.sequentialEngAlphabetChars
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.Execution
@@ -78,6 +79,169 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
     @Test
     fun testStringToInt() = testOperation(KContext::mkStringToInt, KContext::mkStringToIntNoSimplify) {
         listOf("1".expr, "123".expr, "01".expr)
+    }
+
+    /**
+     * https://smt-lib.org/theories-UnicodeStrings.shtml
+     * "The singleton string constants represent all the Unicode code points in 
+     * Planes 0 to 2 of Unicode, ranging from 0x00000 to 0x2FFFF (0 to 196607)."
+     */
+    @Test
+    fun testStringFromCodeFirstSupplementaryCharacter() =
+        checkFromCodeMatchesSolver(0x10000)
+
+    @Test
+    fun testStringFromCodeEmoji() =
+        checkFromCodeMatchesSolver(0x1F44D)
+
+    @Test
+    fun testStringFromCodeLastStandardCodePoint() =
+        checkFromCodeMatchesSolver(STRING_FROM_CODE_UPPER_BOUND)
+
+    @Test
+    fun testStringFromCodeZero() =
+        checkFromCodeMatchesSolver(0)
+
+    @Test
+    fun testStringFromCodeLastBmpCharacter() =
+        checkFromCodeMatchesSolver(0xFFFF)
+
+    @Test
+    fun testStringFromCodeSurrogateCodePoint() =
+        checkFromCodeMatchesSolver(0xD800)
+
+    @Test
+    fun testStringFromCodeBelowRange() =
+        checkFromCodeMatchesSolver(-1)
+
+    @Test
+    fun testStringFromCodeAboveRange() =
+        checkFromCodeMatchesSolver(STRING_FROM_CODE_UPPER_BOUND + 1)
+
+    @Test
+    fun testStringLenOfSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringLenNoSimplify(emoji),
+            simplifiedExpr = mkStringLen(emoji),
+            printArgs = { "str.len of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringToCodeOfSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringToCodeNoSimplify(emoji),
+            simplifiedExpr = mkStringToCode(emoji),
+            printArgs = { "str.to_code of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringAtSupplementaryCharacter() = runTest { _, checker ->
+        val text = textAroundSupplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringSingletonSubNoSimplify(text, mkIntNum(1)),
+            simplifiedExpr = mkStringSingletonSub(text, mkIntNum(1)),
+            printArgs = { "str.at of U+1F44D at code-point index 1" }
+        )
+    }
+
+    @Test
+    fun testStringSubDoesNotSplitSupplementaryCharacter() = runTest { _, checker ->
+        val text = textAroundSupplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringSubNoSimplify(text, mkIntNum(1), mkIntNum(1)),
+            simplifiedExpr = mkStringSub(text, mkIntNum(1), mkIntNum(1)),
+            printArgs = { "str.substr of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringIndexOfSupplementaryCharacter() = runTest { _, checker ->
+        val text = textAroundSupplementaryCharacter()
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringIndexOfNoSimplify(text, emoji, mkIntNum(0)),
+            simplifiedExpr = mkStringIndexOf(text, emoji, mkIntNum(0)),
+            printArgs = { "str.indexof of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringIndexOfDoesNotMatchSurrogateHalf() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        val highSurrogate = mkStringFromCode(mkIntNum(0xD83D))
+        checker.check(
+            unsimplifiedExpr = mkStringIndexOfNoSimplify(emoji, highSurrogate, mkIntNum(0)),
+            simplifiedExpr = mkStringIndexOf(emoji, highSurrogate, mkIntNum(0)),
+            printArgs = { "str.indexof of a surrogate half inside U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringLenOfConcatenatedSupplementaryCharacters() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        val text = mkStringConcat(emoji, emoji)
+        checker.check(
+            unsimplifiedExpr = mkStringLenNoSimplify(text),
+            simplifiedExpr = mkStringLen(text),
+            printArgs = { "str.len of two supplementary characters" }
+        )
+    }
+
+    @Test
+    fun testStringContainsSupplementaryCharacter() = runTest { _, checker ->
+        val text = textAroundSupplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringContainsNoSimplify(text, supplementaryCharacter()),
+            simplifiedExpr = mkStringContains(text, supplementaryCharacter()),
+            printArgs = { "str.contains of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringLtSupplementaryCharacter() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringLtNoSimplify(mkStringLiteral("a"), supplementaryCharacter()),
+            simplifiedExpr = mkStringLt(mkStringLiteral("a"), supplementaryCharacter()),
+            printArgs = { "str.< of a BMP character and U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringReverseKeepsSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        val text = mkStringConcat(emoji, mkStringLiteral("a"))
+        checker.check(
+            unsimplifiedExpr = mkStringConcat(mkStringLiteral("a"), emoji),
+            simplifiedExpr = mkStringReverse(text),
+            printArgs = { "str.rev keeps U+1F44D intact" }
+        )
+    }
+
+    @Test
+    fun testStringIsDigitOfSupplementaryCharacter() = runTest { _, _ ->
+        kotlin.test.assertSame(mkBool(false), mkStringIsDigit(supplementaryCharacter()))
+    }
+
+    private fun KContext.supplementaryCharacter() =
+        mkStringFromCode(mkIntNum(0x1F44D))
+
+    private fun KContext.textAroundSupplementaryCharacter() =
+        mkStringConcat(mkStringConcat(mkStringLiteral("a"), supplementaryCharacter()), mkStringLiteral("b"))
+
+    private fun checkFromCodeMatchesSolver(codePoint: Int) = runTest { _, checker ->
+        val code = mkIntNum(codePoint)
+        checker.check(
+            unsimplifiedExpr = mkStringFromCodeNoSimplify(code),
+            simplifiedExpr = mkStringFromCode(code),
+            printArgs = {
+                "str.from_code($codePoint) folded to ${mkStringFromCode(code)}, " +
+                    "expected the character U+${codePoint.toString(16).uppercase()}"
+            }
+        )
     }
 
     @JvmName("testUnary")
