@@ -8,6 +8,7 @@ import io.ksmt.utils.StringUtils.sequentialEngAlphabetChars
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.Execution
 import org.junit.jupiter.api.parallel.ExecutionMode
+import java.math.BigInteger
 
 @Execution(ExecutionMode.CONCURRENT)
 class StringSimplifyTest: ExpressionSimplifyTest() {
@@ -79,6 +80,68 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
     @Test
     fun testStringToInt() = testOperation(KContext::mkStringToInt, KContext::mkStringToIntNoSimplify) {
         listOf("1".expr, "123".expr, "01".expr)
+    }
+
+    @Test
+    fun testStringToIntTwoToThe63() =
+        checkToIntMatchesSolver(TWO_TO_THE_63.toString())
+
+    @Test
+    fun testStringToIntTwoToThe64() =
+        checkToIntMatchesSolver(TWO_TO_THE_64.toString())
+
+    @Test
+    fun testStringFromIntTwoToThe63() =
+        checkFromIntMatchesSolver(TWO_TO_THE_63)
+
+    @Test
+    fun testStringFromIntTwoToThe64() =
+        checkFromIntMatchesSolver(TWO_TO_THE_64)
+
+    @Test
+    fun testStringToIntLongMaxValue() =
+        checkToIntMatchesSolver(Long.MAX_VALUE.toString())
+
+    @Test
+    fun testStringFromIntLongMaxValue() =
+        checkFromIntMatchesSolver(BigInteger.valueOf(Long.MAX_VALUE))
+
+    @Test
+    fun testStringFromIntNegative() =
+        checkFromIntMatchesSolver(BigInteger.valueOf(-1))
+
+    @Test
+    fun testStringFromIntNegativeTwoToThe64() =
+        checkFromIntMatchesSolver(TWO_TO_THE_64.negate())
+
+    @Test
+    fun testStringToIntNegativeSign() =
+        checkToIntMatchesSolver("-1")
+
+    @Test
+    fun testStringToIntNonDigit() =
+        checkToIntMatchesSolver("12a")
+
+    @Test
+    fun testStringToIntNonAsciiDigit() =
+        checkToIntMatchesSolver("\u0661")
+
+    private fun checkToIntMatchesSolver(digits: String) = runTest { _, checker ->
+        val literal = mkStringLiteral(digits)
+        checker.check(
+            unsimplifiedExpr = mkStringToIntNoSimplify(literal),
+            simplifiedExpr = mkStringToInt(literal),
+            printArgs = { "str.to_int(\"$digits\") folded to ${mkStringToInt(literal)}" }
+        )
+    }
+
+    private fun checkFromIntMatchesSolver(value: BigInteger) = runTest { _, checker ->
+        val number = mkIntNum(value)
+        checker.check(
+            unsimplifiedExpr = mkStringFromIntNoSimplify(number),
+            simplifiedExpr = mkStringFromInt(number),
+            printArgs = { "str.from_int($value) folded to ${mkStringFromInt(number)}" }
+        )
     }
 
     /**
@@ -226,6 +289,33 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
         kotlin.test.assertSame(mkBool(false), mkStringIsDigit(supplementaryCharacter()))
     }
 
+    @Test
+    fun testStringIsDigitZero() = checkIsDigit("0", expected = true)
+
+    @Test
+    fun testStringIsDigitNine() = checkIsDigit("9", expected = true)
+
+    @Test
+    fun testStringIsDigitLetter() = checkIsDigit("a", expected = false)
+
+    @Test
+    fun testStringIsDigitTwoCharacters() = checkIsDigit("10", expected = false)
+
+    @Test
+    fun testStringIsDigitArabicIndicDigit() = checkIsDigit("\u0661", expected = false)
+
+    @Test
+    fun testStringIsDigitFullwidthDigit() = checkIsDigit("\uFF15", expected = false)
+
+    @Test
+    fun testStringIsDigitSuperscriptDigit() = checkIsDigit("\u00B2", expected = false)
+
+    private fun checkIsDigit(text: String, expected: Boolean) = runTest { _, _ ->
+        val folded = mkStringIsDigit(mkStringLiteral(text))
+        val codes = text.codePoints().toArray().joinToString { "U+%04X".format(it) }
+        kotlin.test.assertSame(mkBool(expected), folded, "str.is_digit($codes) folded to $folded")
+    }
+
     private fun KContext.supplementaryCharacter() =
         mkStringFromCode(mkIntNum(0x1F44D))
 
@@ -309,4 +399,9 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
         mkSort = { stringSort },
         test = test
     )
+
+    companion object {
+        private val TWO_TO_THE_63: BigInteger = BigInteger.ONE.shiftLeft(63)
+        private val TWO_TO_THE_64: BigInteger = BigInteger.ONE.shiftLeft(64)
+    }
 }
