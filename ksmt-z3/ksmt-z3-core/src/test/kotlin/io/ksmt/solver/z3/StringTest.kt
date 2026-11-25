@@ -5,10 +5,13 @@ import com.microsoft.z3.Native
 import io.ksmt.KContext
 import io.ksmt.expr.KExpr
 import io.ksmt.solver.KSolverStatus
+import io.ksmt.solver.KSolverUnsupportedFeatureException
 import io.ksmt.sort.KRegexSort
 import io.ksmt.sort.KSort
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class StringTest {
 
@@ -69,6 +72,27 @@ class StringTest {
                 assertEquals(KSolverStatus.SAT, solver.check(), describe(text))
                 assertEquals(literal, solver.model().eval(variable), describe(text))
             }
+        }
+    }
+
+    @Test
+    fun testUnsupportedOperationsStayRejected() = with(context()) {
+        val text = mkConst("s", stringSort)
+        val pattern = mkStringToRegexNoSimplify(text)
+        val index = mkConst("i", intSort)
+
+        KZ3Solver(this).use { solver ->
+            fun <T : KSort> reject(expr: KExpr<T>) {
+                val failure = assertFailsWith<KSolverUnsupportedFeatureException>(expr.toString()) {
+                    solver.assert(expr eq expr)
+                }
+                assertTrue(failure.message!!.contains("not supported in z3"), failure.message)
+            }
+
+            reject(mkStringIndexOfRegexNoSimplify(text, pattern, index))
+            reject(mkStringToLowerNoSimplify(text))
+            reject(mkStringToUpperNoSimplify(text))
+            reject(mkStringReverseNoSimplify(text))
         }
     }
 
