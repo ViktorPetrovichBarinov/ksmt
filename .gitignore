@@ -9,3 +9,4 @@ build
 
 # ignore ksmt test data
 ksmt-test/testData
+.sdkmanrc
