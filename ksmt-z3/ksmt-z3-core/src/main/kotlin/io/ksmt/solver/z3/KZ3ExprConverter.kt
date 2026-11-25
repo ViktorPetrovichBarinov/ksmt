@@ -415,7 +415,7 @@ open class KZ3ExprConverter(
             }
 
             // Currently, KSMT supports the only type of sequences - strings
-            Z3_decl_kind.Z3_OP_SEQ_CONCAT -> expr.convert(::mkStringConcat)
+            Z3_decl_kind.Z3_OP_SEQ_CONCAT -> expr.convertReduced(::mkStringConcat)
             Z3_decl_kind.Z3_OP_SEQ_LENGTH -> expr.convert(::mkStringLen)
             Z3_decl_kind.Z3_OP_SEQ_TO_RE -> expr.convert(::mkStringToRegex)
             Z3_decl_kind.Z3_OP_SEQ_IN_RE -> expr.convert(::mkStringInRegex)
@@ -442,9 +442,9 @@ open class KZ3ExprConverter(
             Z3_decl_kind.Z3_OP_STR_FROM_CODE -> expr.convert(::mkStringFromCode)
             Z3_decl_kind.Z3_OP_STR_TO_INT -> expr.convert(::mkStringToInt)
             Z3_decl_kind.Z3_OP_INT_TO_STR -> expr.convert(::mkStringFromInt)
-            Z3_decl_kind.Z3_OP_RE_CONCAT -> expr.convert(::mkRegexConcat)
-            Z3_decl_kind.Z3_OP_RE_UNION -> expr.convert(::mkRegexUnion)
-            Z3_decl_kind.Z3_OP_RE_INTERSECT -> expr.convert(::mkRegexIntersection)
+            Z3_decl_kind.Z3_OP_RE_CONCAT -> expr.convertReduced(::mkRegexConcat)
+            Z3_decl_kind.Z3_OP_RE_UNION -> expr.convertReduced(::mkRegexUnion)
+            Z3_decl_kind.Z3_OP_RE_INTERSECT -> expr.convertReduced(::mkRegexIntersection)
             Z3_decl_kind.Z3_OP_RE_STAR -> expr.convert(::mkRegexStar)
             Z3_decl_kind.Z3_OP_RE_PLUS -> expr.convert(::mkRegexCross)
             Z3_decl_kind.Z3_OP_RE_DIFF -> expr.convert(::mkRegexDifference)

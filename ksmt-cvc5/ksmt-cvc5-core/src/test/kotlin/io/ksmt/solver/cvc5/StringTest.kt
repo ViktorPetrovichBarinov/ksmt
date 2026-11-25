@@ -1,6 +1,8 @@
 package io.ksmt.solver.cvc5
 
+import io.github.cvc5.Kind
 import io.github.cvc5.Solver
+import io.github.cvc5.Term
 import io.ksmt.KContext
 import io.ksmt.expr.KExpr
 import io.ksmt.solver.KSolverStatus
@@ -63,6 +65,66 @@ class StringTest {
                 solver.assert(variable eq literal)
                 assertEquals(KSolverStatus.SAT, solver.check(), describe(text))
                 assertEquals(literal, solver.model().eval(variable), describe(text))
+            }
+        }
+    }
+
+    @Test
+    fun testThreeArgumentsBecomeNestedPairs() = with(context()) {
+        val first = mkConst("a", stringSort)
+        val second = mkConst("b", stringSort)
+        val third = mkConst("c", stringSort)
+        val firstPattern = mkStringToRegexNoSimplify(first)
+        val secondPattern = mkStringToRegexNoSimplify(second)
+        val thirdPattern = mkStringToRegexNoSimplify(third)
+        val ctx = this
+
+        KCvc5TermManager().use { terms ->
+            val cvc5Ctx = KCvc5Context(terms, ctx)
+            val nativeSolver = terms.builder { Solver(this) }
+            try {
+                val internalizer = KCvc5ExprInternalizer(cvc5Ctx, nativeSolver)
+                val converter = KCvc5ExprConverter(ctx, cvc5Ctx, nativeSolver)
+                fun native(expr: KExpr<*>) = with(internalizer) { expr.internalizeExpr() }
+                fun restore(nativeExpr: Term): KExpr<*> = with(converter) { nativeExpr.convertExpr<KSort>() }
+
+                val strings = arrayOf(native(first), native(second), native(third))
+                val patterns = arrayOf(native(firstPattern), native(secondPattern), native(thirdPattern))
+                fun check(expected: KExpr<*>, nativeExpr: Term, label: String) {
+                    assertEquals(expected, restore(nativeExpr), label)
+                }
+
+                check(
+                    mkStringConcatNoSimplify(mkStringConcatNoSimplify(first, second), third),
+                    terms.mkTerm(Kind.STRING_CONCAT, strings),
+                    "concat"
+                )
+                check(
+                    mkRegexConcatNoSimplify(
+                        mkRegexConcatNoSimplify(firstPattern, secondPattern),
+                        thirdPattern
+                    ),
+                    terms.mkTerm(Kind.REGEXP_CONCAT, patterns),
+                    "re.++"
+                )
+                check(
+                    mkRegexUnionNoSimplify(
+                        mkRegexUnionNoSimplify(firstPattern, secondPattern),
+                        thirdPattern
+                    ),
+                    terms.mkTerm(Kind.REGEXP_UNION, patterns),
+                    "re.union"
+                )
+                check(
+                    mkRegexIntersectionNoSimplify(
+                        mkRegexIntersectionNoSimplify(firstPattern, secondPattern),
+                        thirdPattern
+                    ),
+                    terms.mkTerm(Kind.REGEXP_INTER, patterns),
+                    "re.inter"
+                )
+            } finally {
+                cvc5Ctx.close()
             }
         }
     }

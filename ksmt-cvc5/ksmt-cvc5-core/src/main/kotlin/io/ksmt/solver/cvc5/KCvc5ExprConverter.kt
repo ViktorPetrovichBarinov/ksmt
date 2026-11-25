@@ -407,7 +407,7 @@ open class KCvc5ExprConverter(
             Kind.STORE -> convertNativeArrayStore(expr)
 
             // strings
-            Kind.STRING_CONCAT -> expr.convert(::mkStringConcat)
+            Kind.STRING_CONCAT -> expr.convertReduced(::mkStringConcat)
             Kind.STRING_LENGTH -> expr.convert(::mkStringLen)
             Kind.STRING_TO_REGEXP -> expr.convert(::mkStringToRegex)
             Kind.STRING_IN_REGEXP -> expr.convert(::mkStringInRegex)
@@ -437,9 +437,9 @@ open class KCvc5ExprConverter(
             )
 
             // regex
-            Kind.REGEXP_CONCAT -> expr.convert(::mkRegexConcat)
-            Kind.REGEXP_UNION -> expr.convert(::mkRegexUnion)
-            Kind.REGEXP_INTER -> expr.convert(::mkRegexIntersection)
+            Kind.REGEXP_CONCAT -> expr.convertReduced(::mkRegexConcat)
+            Kind.REGEXP_UNION -> expr.convertReduced(::mkRegexUnion)
+            Kind.REGEXP_INTER -> expr.convertReduced(::mkRegexIntersection)
             Kind.REGEXP_STAR -> expr.convert(::mkRegexStar)
             Kind.REGEXP_PLUS -> expr.convert(::mkRegexCross)
             Kind.REGEXP_DIFF -> expr.convert(::mkRegexDifference)

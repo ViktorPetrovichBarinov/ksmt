@@ -1,6 +1,7 @@
 package io.ksmt.solver.z3
 
 import com.microsoft.z3.Context
+import com.microsoft.z3.Native
 import io.ksmt.KContext
 import io.ksmt.expr.KExpr
 import io.ksmt.solver.KSolverStatus
@@ -64,6 +65,59 @@ class StringTest {
                 assertEquals(KSolverStatus.SAT, solver.check(), describe(text))
                 assertEquals(literal, solver.model().eval(variable), describe(text))
             }
+        }
+    }
+
+    @Test
+    fun testThreeArgumentsBecomeNestedPairs() = with(context()) {
+        val first = mkConst("a", stringSort)
+        val second = mkConst("b", stringSort)
+        val third = mkConst("c", stringSort)
+        val firstPattern = mkStringToRegexNoSimplify(first)
+        val secondPattern = mkStringToRegexNoSimplify(second)
+        val thirdPattern = mkStringToRegexNoSimplify(third)
+
+        Context().use { z3Native ->
+            val internalizer = KZ3ExprInternalizer(this, KZ3Context(this, z3Native))
+            val converter = KZ3ExprConverter(this, KZ3Context(this, z3Native))
+            fun native(expr: KExpr<*>) = with(internalizer) { expr.internalizeExpr() }
+            fun restore(nativeExpr: Long): KExpr<*> = with(converter) { nativeExpr.convertExpr<KSort>() }
+
+            val strings = longArrayOf(native(first), native(second), native(third))
+            val patterns = longArrayOf(native(firstPattern), native(secondPattern), native(thirdPattern))
+            fun check(expected: KExpr<*>, nativeExpr: Long, label: String) {
+                assertEquals(expected, restore(nativeExpr), label)
+            }
+
+            check(
+                mkStringConcatNoSimplify(first, mkStringConcatNoSimplify(second, third)),
+                Native.mkSeqConcat(internalizer.nCtx, 3, strings),
+                "concat"
+            )
+            check(
+                mkRegexConcatNoSimplify(
+                    mkRegexConcatNoSimplify(firstPattern, secondPattern),
+                    thirdPattern
+                ),
+                Native.mkReConcat(internalizer.nCtx, 3, patterns),
+                "re.++"
+            )
+            check(
+                mkRegexUnionNoSimplify(
+                    mkRegexUnionNoSimplify(firstPattern, secondPattern),
+                    thirdPattern
+                ),
+                Native.mkReUnion(internalizer.nCtx, 3, patterns),
+                "re.union"
+            )
+            check(
+                mkRegexIntersectionNoSimplify(
+                    mkRegexIntersectionNoSimplify(firstPattern, secondPattern),
+                    thirdPattern
+                ),
+                Native.mkReIntersect(internalizer.nCtx, 3, patterns),
+                "re.inter"
+            )
         }
     }
 
