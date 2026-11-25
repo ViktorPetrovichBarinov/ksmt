@@ -209,6 +209,7 @@ import io.ksmt.expr.rewrite.simplify.simplifyBvRotateLeftExpr
 import io.ksmt.expr.rewrite.simplify.simplifyBvRotateRightExpr
 import io.ksmt.solver.KSolverUnsupportedFeatureException
 import io.ksmt.solver.util.KExprInternalizerBase
+import io.ksmt.utils.StringUtils
 import io.ksmt.sort.KArithSort
 import io.ksmt.sort.KArray2Sort
 import io.ksmt.sort.KArray3Sort
@@ -1334,7 +1335,31 @@ class KCvc5ExprInternalizer(
     }
 
     override fun transform(expr: KStringLiteralExpr) = with(expr) {
-        transform { tm.builder { mkString(expr.value) } }
+        transform {
+            // TermManager.mkString(String) passes the Java string through JNI.
+            // That encoding drops U+0000 and splits a supplementary character.
+            // The int[] overload is missing from the shipped native library.
+            tm.builder {
+                if (value.all { it.code in 1..127 }) {
+                    mkString(value)
+                } else {
+                    mkString(escapeCodePoints(value), true)
+                }
+            }
+        }
+    }
+
+    private fun escapeCodePoints(value: String): String = buildString {
+        for (codePoint in StringUtils.codePoints(value)) {
+            val printableAscii = codePoint in 0x20..0x7E && codePoint != '"'.code && codePoint != '\\'.code
+            if (printableAscii) {
+                append(codePoint.toChar())
+            } else {
+                append("\\u{")
+                append(codePoint.toString(16))
+                append('}')
+            }
+        }
     }
 
     // regex

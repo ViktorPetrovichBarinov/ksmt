@@ -605,7 +605,16 @@ open class KZ3ExprConverter(
 
     @Suppress("MemberVisibilityCanBePrivate")
     fun convertStringLiteral(expr: Long): KStringLiteralExpr = with(ctx) {
-        val value = Native.getString(nCtx, expr)
+        // Native.getString is a null-terminated modified UTF-8 view. It drops U+0000
+        // and splits a supplementary character. The contents are the raw code points.
+        val length = Native.getStringLength(nCtx, expr)
+        val value = if (length == 0) {
+            ""
+        } else {
+            val codePoints = IntArray(length)
+            Native.getStringContents(nCtx, expr, length, codePoints)
+            String(codePoints, 0, codePoints.size)
+        }
         mkStringLiteral(value)
     }
 
