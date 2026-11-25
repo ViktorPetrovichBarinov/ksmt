@@ -966,20 +966,23 @@ open class KZ3ExprInternalizer(
         }
     }
 
-    override fun transform(expr: KStringReplaceAllExpr) =
-        throw KSolverUnsupportedFeatureException(
-            "${expr::class.simpleName} is not supported in z3"
-        )
+    override fun transform(expr: KStringReplaceAllExpr) = with(expr) {
+        transform(arg0, arg1, arg2) { arg0, arg1, arg2 ->
+            Native.mkSeqReplaceAll(nCtx, arg0, arg1, arg2)
+        }
+    }
 
-    override fun transform(expr: KStringReplaceWithRegexExpr) =
-        throw KSolverUnsupportedFeatureException(
-            "${expr::class.simpleName} is not supported in z3"
-        )
+    override fun transform(expr: KStringReplaceWithRegexExpr) = with(expr) {
+        transform(arg0, arg1, arg2) { arg0, arg1, arg2 ->
+            Native.mkSeqReplaceRe(nCtx, arg0, arg1, arg2)
+        }
+    }
 
-    override fun transform(expr: KStringReplaceAllWithRegexExpr) =
-        throw KSolverUnsupportedFeatureException(
-            "${expr::class.simpleName} is not supported in z3"
-        )
+    override fun transform(expr: KStringReplaceAllWithRegexExpr) = with(expr) {
+        transform(arg0, arg1, arg2) { arg0, arg1, arg2 ->
+            Native.mkSeqReplaceReAll(nCtx, arg0, arg1, arg2)
+        }
+    }
 
     override fun transform(expr: KStringToLowerExpr) =
         throw KSolverUnsupportedFeatureException(
