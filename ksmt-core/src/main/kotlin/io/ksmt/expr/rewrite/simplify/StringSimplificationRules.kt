@@ -16,6 +16,7 @@ import io.ksmt.sort.KStringSort
 import io.ksmt.utils.ArithUtils.bigIntegerValue
 import io.ksmt.utils.StringUtils
 import io.ksmt.utils.StringUtils.STRING_FROM_CODE_UPPER_BOUND
+import java.math.BigInteger
 
 /*
 * String concatenation simplification
@@ -241,18 +242,14 @@ inline fun KContext.simplifyStringIndexOfBasic(
     if (arg0 is KStringLiteralExpr && arg1 is KStringLiteralExpr && arg2 is KIntNumExpr) {
         val str = arg0.value
         val search = arg1.value
-        val startPosLong = arg2.toLongValue()
-        val startPos: Int
-        if (startPosLong <= Int.MAX_VALUE) {
-            startPos = startPosLong.toInt()
+        val start = arg2.bigIntegerValue
+        val length = BigInteger.valueOf(str.codePointCount(0, str.length).toLong())
+        val result = if (search.isEmpty()) {
+            if (start.signum() >= 0 && start <= length) start else BigInteger.valueOf(-1)
+        } else if (start.signum() < 0 || start > length) {
+            BigInteger.valueOf(-1)
         } else {
-            return cont(arg0, arg1, arg2)
-        }
-
-        val result = if (startPos >= 0) {
-            StringUtils.indexOfCodePoints(str, search, startPos)
-        } else {
-            -1
+            BigInteger.valueOf(StringUtils.indexOfCodePoints(str, search, start.intValueExact()).toLong())
         }
         return mkIntNum(result)
     } else {

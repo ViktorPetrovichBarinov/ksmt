@@ -136,14 +136,14 @@ object StringUtils {
     fun stringToLowerCase(
         arg: KStringLiteralExpr
     ): KStringLiteralExpr = with(arg.ctx) {
-        mkStringLiteral(arg.value.lowercase())
+        mkStringLiteral(mapAsciiCase(arg.value, upper = false))
     }
 
     @JvmStatic
     fun stringToUpperCase(
         arg: KStringLiteralExpr
     ): KStringLiteralExpr = with(arg.ctx) {
-        mkStringLiteral(arg.value.uppercase())
+        mkStringLiteral(mapAsciiCase(arg.value, upper = true))
     }
 
     @JvmStatic
@@ -191,7 +191,7 @@ object StringUtils {
         val str = arg0.value
         val search = arg1.value
         val replace = arg2.value
-        return mkStringLiteral(if (search.isEmpty()) (replace + str) else str.replaceFirst(search, replace))
+        return mkStringLiteral(replaceFirstCodePoints(str, search, replace))
     }
 
     @JvmStatic
@@ -234,6 +234,63 @@ object StringUtils {
         if (needle.size > text.size) return false
         val offset = text.size - needle.size
         return needle.indices.all { needle[it] == text[offset + it] }
+    }
+
+    /** SMT-LIB body of a string literal, without the surrounding quotes. */
+    @JvmStatic
+    fun smtLibStringBody(value: String): String = buildString {
+        for (codePoint in codePoints(value)) {
+            val printableAscii = codePoint in 0x20..0x7E &&
+                codePoint != '"'.code &&
+                codePoint != '\\'.code
+            if (printableAscii) {
+                append(codePoint.toChar())
+            } else {
+                append("\\u{").append(codePoint.toString(16)).append('}')
+            }
+        }
+    }
+
+    /** ASCII A-Z and a-z only. Every other code point stays as it is. */
+    private fun mapAsciiCase(value: String, upper: Boolean): String {
+        val points = codePoints(value)
+        for (index in points.indices) {
+            val code = points[index]
+            points[index] = when {
+                !upper && code in 'A'.code..'Z'.code -> code + 32
+                upper && code in 'a'.code..'z'.code -> code - 32
+                else -> code
+            }
+        }
+        return String(points, 0, points.size)
+    }
+
+    /** First literal match by code points. An empty search is prepended. */
+    private fun replaceFirstCodePoints(value: String, search: String, replacement: String): String {
+        if (search.isEmpty()) return replacement + value
+        val text = codePoints(value)
+        val needle = codePoints(search)
+        if (needle.size > text.size) return value
+        val inserted = codePoints(replacement)
+        val out = ArrayList<Int>(text.size + inserted.size)
+        var index = 0
+        val last = text.size - needle.size
+        while (index <= last) {
+            val matches = needle.indices.all { needle[it] == text[index + it] }
+            if (matches) {
+                inserted.forEach { out.add(it) }
+                index += needle.size
+                while (index < text.size) {
+                    out.add(text[index])
+                    index++
+                }
+                val points = out.toIntArray()
+                return String(points, 0, points.size)
+            }
+            out.add(text[index])
+            index++
+        }
+        return value
     }
 
     /** Non-overlapping replacement by code points. An empty search leaves the string unchanged. */

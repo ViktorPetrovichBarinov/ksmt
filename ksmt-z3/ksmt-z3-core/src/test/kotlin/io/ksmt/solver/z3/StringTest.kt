@@ -97,6 +97,25 @@ class StringTest {
     }
 
     @Test
+    fun testPrintedLiteralParsesBack() = with(context()) {
+        listOf(
+            "\"",
+            "\\",
+            "\n",
+            "\u0000",
+            String(Character.toChars(0x1F44D))
+        ).forEach { text ->
+            val literal = mkStringLiteral(text)
+            val variable = mkConst("s", stringSort)
+            val assertion = variable eq literal
+            val parsed = KZ3SMTLibParser(this).parse(
+                "(declare-fun s () String)\n(assert $assertion)"
+            )
+            assertEquals(listOf(assertion), parsed, literal.toString())
+        }
+    }
+
+    @Test
     fun testThreeArgumentsBecomeNestedPairs() = checkArguments(3)
 
     @Test

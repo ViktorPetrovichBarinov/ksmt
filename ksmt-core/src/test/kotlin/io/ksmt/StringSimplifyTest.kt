@@ -73,6 +73,57 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
     }
 
     @Test
+    fun testStringReplaceTreatsDotAsText() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = "ab".expr,
+            simplifiedExpr = mkStringReplace("ab".expr, ".".expr, "X".expr),
+            printArgs = { "str.replace of a dot" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceTreatsDollarAsText() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = "aXb".expr,
+            simplifiedExpr = mkStringReplace("a\$b".expr, "\$".expr, "X".expr),
+            printArgs = { "str.replace of a dollar sign" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = "aXb".expr,
+            simplifiedExpr = mkStringReplace(
+                mkStringConcat(mkStringConcat("a".expr, emoji), "b".expr),
+                emoji,
+                "X".expr
+            ),
+            printArgs = { "str.replace of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceDoesNotMatchSurrogateHalf() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = emoji,
+            simplifiedExpr = mkStringReplace(emoji, highSurrogateOfEmoji(), "X".expr),
+            printArgs = { "str.replace of a surrogate half inside U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceEmptySearch() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = "caba".expr,
+            simplifiedExpr = mkStringReplace("aba".expr, "".expr, "c".expr),
+            printArgs = { "str.replace of the empty string" }
+        )
+    }
+
+    @Test
     fun testStringConcat() = testOperation(KContext::mkStringConcat, KContext::mkStringConcatNoSimplify) {
         listOf("".expr, "ab".expr, "\uD83D\uDC4D".expr)
     }
@@ -165,6 +216,46 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
             unsimplifiedExpr = mkStringConcat("A".expr, emoji),
             simplifiedExpr = mkStringToUpper(mkStringConcat("a".expr, emoji)),
             printArgs = { "str.to_upper keeps U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringToLowerKeepsTurkishI() = runTest { _, checker ->
+        val letter = mkStringLiteral("\u0130")
+        checker.check(
+            unsimplifiedExpr = letter,
+            simplifiedExpr = mkStringToLower(letter),
+            printArgs = { "str.to_lower keeps U+0130" }
+        )
+    }
+
+    @Test
+    fun testStringToUpperKeepsTurkishI() = runTest { _, checker ->
+        val letter = mkStringLiteral("\u0130")
+        checker.check(
+            unsimplifiedExpr = letter,
+            simplifiedExpr = mkStringToUpper(letter),
+            printArgs = { "str.to_upper keeps U+0130" }
+        )
+    }
+
+    @Test
+    fun testStringToLowerKeepsEszett() = runTest { _, checker ->
+        val letter = mkStringLiteral("\u00DF")
+        checker.check(
+            unsimplifiedExpr = letter,
+            simplifiedExpr = mkStringToLower(letter),
+            printArgs = { "str.to_lower keeps U+00DF" }
+        )
+    }
+
+    @Test
+    fun testStringToUpperKeepsEszett() = runTest { _, checker ->
+        val letter = mkStringLiteral("\u00DF")
+        checker.check(
+            unsimplifiedExpr = letter,
+            simplifiedExpr = mkStringToUpper(letter),
+            printArgs = { "str.to_upper keeps U+00DF" }
         )
     }
 
@@ -326,6 +417,24 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
             simplifiedExpr = mkStringIndexOf(text, emoji, mkIntNum(0)),
             printArgs = { "str.indexof of U+1F44D" }
         )
+    }
+
+    @Test
+    fun testStringIndexOfHugeNegativeStart() = runTest { _, _ ->
+        val folded = mkStringIndexOf("abc".expr, "a".expr, mkIntNum(-4294967296L))
+        kotlin.test.assertSame(mkIntNum(-1), folded, "str.indexof with a huge negative start")
+    }
+
+    @Test
+    fun testStringIndexOfStartBeyondIntMax() = runTest { _, _ ->
+        val folded = mkStringIndexOf("abc".expr, "a".expr, mkIntNum(1L shl 31))
+        kotlin.test.assertSame(mkIntNum(-1), folded, "str.indexof with a start past Int.MAX_VALUE")
+    }
+
+    @Test
+    fun testStringIndexOfEmptySearchAtLength() = runTest { _, _ ->
+        val folded = mkStringIndexOf("ab".expr, "".expr, mkIntNum(2))
+        kotlin.test.assertSame(mkIntNum(2), folded, "str.indexof of the empty string at the length")
     }
 
     @Test
