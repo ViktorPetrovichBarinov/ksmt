@@ -5,6 +5,7 @@ import com.microsoft.z3.Native
 import io.ksmt.KContext
 import io.ksmt.expr.KExpr
 import io.ksmt.solver.KSolverStatus
+import io.ksmt.sort.KRegexSort
 import io.ksmt.sort.KSort
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -69,53 +70,60 @@ class StringTest {
     }
 
     @Test
-    fun testThreeArgumentsBecomeNestedPairs() = with(context()) {
-        val first = mkConst("a", stringSort)
-        val second = mkConst("b", stringSort)
-        val third = mkConst("c", stringSort)
-        val firstPattern = mkStringToRegexNoSimplify(first)
-        val secondPattern = mkStringToRegexNoSimplify(second)
-        val thirdPattern = mkStringToRegexNoSimplify(third)
+    fun testThreeArgumentsBecomeNestedPairs() = checkArguments(3)
+
+    @Test
+    fun testFourArgumentsBecomeNestedPairs() = checkArguments(4)
+
+    @Test
+    fun testFiveArgumentsBecomeNestedPairs() = checkArguments(5)
+
+    @Test
+    fun testSixArgumentsBecomeNestedPairs() = checkArguments(6)
+
+    @Test
+    fun testSevenArgumentsBecomeNestedPairs() = checkArguments(7)
+
+    @Test
+    fun testEightArgumentsBecomeNestedPairs() = checkArguments(8)
+
+    @Test
+    fun testTwentyArgumentsBecomeNestedPairs() = checkArguments(20)
+
+    private fun checkArguments(count: Int) = with(context()) {
+        val strings = List(count) { mkConst("s$it", stringSort) }
+        val patterns: List<KExpr<KRegexSort>> = strings.map { mkStringToRegexNoSimplify(it) }
 
         Context().use { z3Native ->
             val internalizer = KZ3ExprInternalizer(this, KZ3Context(this, z3Native))
             val converter = KZ3ExprConverter(this, KZ3Context(this, z3Native))
             fun native(expr: KExpr<*>) = with(internalizer) { expr.internalizeExpr() }
             fun restore(nativeExpr: Long): KExpr<*> = with(converter) { nativeExpr.convertExpr<KSort>() }
-
-            val strings = longArrayOf(native(first), native(second), native(third))
-            val patterns = longArrayOf(native(firstPattern), native(secondPattern), native(thirdPattern))
             fun check(expected: KExpr<*>, nativeExpr: Long, label: String) {
-                assertEquals(expected, restore(nativeExpr), label)
+                assertEquals(expected, restore(nativeExpr), "$count $label")
             }
 
+            val nativeStrings = LongArray(count) { native(strings[it]) }
+            val nativePatterns = LongArray(count) { native(patterns[it]) }
+
             check(
-                mkStringConcatNoSimplify(first, mkStringConcatNoSimplify(second, third)),
-                Native.mkSeqConcat(internalizer.nCtx, 3, strings),
+                strings.reduceRight { left, right -> mkStringConcatNoSimplify(left, right) },
+                Native.mkSeqConcat(internalizer.nCtx, count, nativeStrings),
                 "concat"
             )
             check(
-                mkRegexConcatNoSimplify(
-                    mkRegexConcatNoSimplify(firstPattern, secondPattern),
-                    thirdPattern
-                ),
-                Native.mkReConcat(internalizer.nCtx, 3, patterns),
+                patterns.reduce { left, right -> mkRegexConcatNoSimplify(left, right) },
+                Native.mkReConcat(internalizer.nCtx, count, nativePatterns),
                 "re.++"
             )
             check(
-                mkRegexUnionNoSimplify(
-                    mkRegexUnionNoSimplify(firstPattern, secondPattern),
-                    thirdPattern
-                ),
-                Native.mkReUnion(internalizer.nCtx, 3, patterns),
+                patterns.reduce { left, right -> mkRegexUnionNoSimplify(left, right) },
+                Native.mkReUnion(internalizer.nCtx, count, nativePatterns),
                 "re.union"
             )
             check(
-                mkRegexIntersectionNoSimplify(
-                    mkRegexIntersectionNoSimplify(firstPattern, secondPattern),
-                    thirdPattern
-                ),
-                Native.mkReIntersect(internalizer.nCtx, 3, patterns),
+                patterns.reduce { left, right -> mkRegexIntersectionNoSimplify(left, right) },
+                Native.mkReIntersect(internalizer.nCtx, count, nativePatterns),
                 "re.inter"
             )
         }

@@ -6,6 +6,7 @@ import io.github.cvc5.Term
 import io.ksmt.KContext
 import io.ksmt.expr.KExpr
 import io.ksmt.solver.KSolverStatus
+import io.ksmt.sort.KRegexSort
 import io.ksmt.sort.KSort
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,13 +71,29 @@ class StringTest {
     }
 
     @Test
-    fun testThreeArgumentsBecomeNestedPairs() = with(context()) {
-        val first = mkConst("a", stringSort)
-        val second = mkConst("b", stringSort)
-        val third = mkConst("c", stringSort)
-        val firstPattern = mkStringToRegexNoSimplify(first)
-        val secondPattern = mkStringToRegexNoSimplify(second)
-        val thirdPattern = mkStringToRegexNoSimplify(third)
+    fun testThreeArgumentsBecomeNestedPairs() = checkArguments(3)
+
+    @Test
+    fun testFourArgumentsBecomeNestedPairs() = checkArguments(4)
+
+    @Test
+    fun testFiveArgumentsBecomeNestedPairs() = checkArguments(5)
+
+    @Test
+    fun testSixArgumentsBecomeNestedPairs() = checkArguments(6)
+
+    @Test
+    fun testSevenArgumentsBecomeNestedPairs() = checkArguments(7)
+
+    @Test
+    fun testEightArgumentsBecomeNestedPairs() = checkArguments(8)
+
+    @Test
+    fun testTwentyArgumentsBecomeNestedPairs() = checkArguments(20)
+
+    private fun checkArguments(count: Int) = with(context()) {
+        val strings = List(count) { mkConst("s$it", stringSort) }
+        val patterns: List<KExpr<KRegexSort>> = strings.map { mkStringToRegexNoSimplify(it) }
         val ctx = this
 
         KCvc5TermManager().use { terms ->
@@ -87,40 +104,31 @@ class StringTest {
                 val converter = KCvc5ExprConverter(ctx, cvc5Ctx, nativeSolver)
                 fun native(expr: KExpr<*>) = with(internalizer) { expr.internalizeExpr() }
                 fun restore(nativeExpr: Term): KExpr<*> = with(converter) { nativeExpr.convertExpr<KSort>() }
-
-                val strings = arrayOf(native(first), native(second), native(third))
-                val patterns = arrayOf(native(firstPattern), native(secondPattern), native(thirdPattern))
                 fun check(expected: KExpr<*>, nativeExpr: Term, label: String) {
-                    assertEquals(expected, restore(nativeExpr), label)
+                    assertEquals(expected, restore(nativeExpr), "$count $label")
                 }
 
+                val nativeStrings = Array(count) { native(strings[it]) }
+                val nativePatterns = Array(count) { native(patterns[it]) }
+
                 check(
-                    mkStringConcatNoSimplify(mkStringConcatNoSimplify(first, second), third),
-                    terms.mkTerm(Kind.STRING_CONCAT, strings),
+                    strings.reduce { left, right -> mkStringConcatNoSimplify(left, right) },
+                    terms.mkTerm(Kind.STRING_CONCAT, nativeStrings),
                     "concat"
                 )
                 check(
-                    mkRegexConcatNoSimplify(
-                        mkRegexConcatNoSimplify(firstPattern, secondPattern),
-                        thirdPattern
-                    ),
-                    terms.mkTerm(Kind.REGEXP_CONCAT, patterns),
+                    patterns.reduce { left, right -> mkRegexConcatNoSimplify(left, right) },
+                    terms.mkTerm(Kind.REGEXP_CONCAT, nativePatterns),
                     "re.++"
                 )
                 check(
-                    mkRegexUnionNoSimplify(
-                        mkRegexUnionNoSimplify(firstPattern, secondPattern),
-                        thirdPattern
-                    ),
-                    terms.mkTerm(Kind.REGEXP_UNION, patterns),
+                    patterns.reduce { left, right -> mkRegexUnionNoSimplify(left, right) },
+                    terms.mkTerm(Kind.REGEXP_UNION, nativePatterns),
                     "re.union"
                 )
                 check(
-                    mkRegexIntersectionNoSimplify(
-                        mkRegexIntersectionNoSimplify(firstPattern, secondPattern),
-                        thirdPattern
-                    ),
-                    terms.mkTerm(Kind.REGEXP_INTER, patterns),
+                    patterns.reduce { left, right -> mkRegexIntersectionNoSimplify(left, right) },
+                    terms.mkTerm(Kind.REGEXP_INTER, nativePatterns),
                     "re.inter"
                 )
             } finally {
