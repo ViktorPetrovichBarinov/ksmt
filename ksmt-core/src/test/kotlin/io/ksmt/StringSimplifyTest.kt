@@ -73,6 +73,102 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
     }
 
     @Test
+    fun testStringConcat() = testOperation(KContext::mkStringConcat, KContext::mkStringConcatNoSimplify) {
+        listOf("".expr, "ab".expr, "\uD83D\uDC4D".expr)
+    }
+
+    @Test
+    fun testStringConcatFoldsSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringLiteral("a\uD83D\uDC4Db"),
+            simplifiedExpr = mkStringConcat(mkStringConcat("a".expr, emoji), "b".expr),
+            printArgs = { "concat keeps U+1F44D intact" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceAll() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = "cbc".expr,
+            simplifiedExpr = mkStringReplaceAll("aba".expr, "a".expr, "c".expr),
+            printArgs = { "str.replace_all of a" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceAllEmptySearch() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = "aba".expr,
+            simplifiedExpr = mkStringReplaceAll("aba".expr, "".expr, "c".expr),
+            printArgs = { "str.replace_all of the empty string" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceAllSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = "aXb".expr,
+            simplifiedExpr = mkStringReplaceAll(
+                mkStringConcat(mkStringConcat("a".expr, emoji), "b".expr),
+                emoji,
+                "X".expr
+            ),
+            printArgs = { "str.replace_all of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringReplaceAllDoesNotMatchSurrogateHalf() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        val highSurrogate = mkStringFromCode(mkIntNum(0xD83D))
+        checker.check(
+            unsimplifiedExpr = emoji,
+            simplifiedExpr = mkStringReplaceAll(emoji, highSurrogate, "X".expr),
+            printArgs = { "str.replace_all of a surrogate half inside U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringToLower() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = "abc".expr,
+            simplifiedExpr = mkStringToLower("AbC".expr),
+            printArgs = { "str.to_lower of AbC" }
+        )
+    }
+
+    @Test
+    fun testStringToUpper() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = "ABC".expr,
+            simplifiedExpr = mkStringToUpper("AbC".expr),
+            printArgs = { "str.to_upper of AbC" }
+        )
+    }
+
+    @Test
+    fun testStringToLowerKeepsSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringConcat("a".expr, emoji),
+            simplifiedExpr = mkStringToLower(mkStringConcat("A".expr, emoji)),
+            printArgs = { "str.to_lower keeps U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringToUpperKeepsSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringConcat("A".expr, emoji),
+            simplifiedExpr = mkStringToUpper(mkStringConcat("a".expr, emoji)),
+            printArgs = { "str.to_upper keeps U+1F44D" }
+        )
+    }
+
+    @Test
     fun testStringToCode() = testOperation(KContext::mkStringToCode, KContext::mkStringToCodeNoSimplify) {
         sequentialEngAlphabetChars()
     }
@@ -274,6 +370,89 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
     }
 
     @Test
+    fun testStringLtLastBmpBeforeFirstSupplementary() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringLtNoSimplify(lastBmpCharacter(), firstSupplementaryCharacter()),
+            simplifiedExpr = mkStringLt(lastBmpCharacter(), firstSupplementaryCharacter()),
+            printArgs = { "str.< of U+FFFF and U+10000" }
+        )
+    }
+
+    @Test
+    fun testStringLeLastBmpBeforeFirstSupplementary() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringLeNoSimplify(lastBmpCharacter(), firstSupplementaryCharacter()),
+            simplifiedExpr = mkStringLe(lastBmpCharacter(), firstSupplementaryCharacter()),
+            printArgs = { "str.<= of U+FFFF and U+10000" }
+        )
+    }
+
+    @Test
+    fun testStringGtFirstSupplementaryAfterLastBmp() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringGtNoSimplify(firstSupplementaryCharacter(), lastBmpCharacter()),
+            simplifiedExpr = mkStringGt(firstSupplementaryCharacter(), lastBmpCharacter()),
+            printArgs = { "str.> of U+10000 and U+FFFF" }
+        )
+    }
+
+    @Test
+    fun testStringGeFirstSupplementaryAfterLastBmp() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringGeNoSimplify(firstSupplementaryCharacter(), lastBmpCharacter()),
+            simplifiedExpr = mkStringGe(firstSupplementaryCharacter(), lastBmpCharacter()),
+            printArgs = { "str.>= of U+10000 and U+FFFF" }
+        )
+    }
+
+    @Test
+    fun testStringContainsDoesNotMatchSurrogateHalf() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringContainsNoSimplify(supplementaryCharacter(), highSurrogateOfEmoji()),
+            simplifiedExpr = mkStringContains(supplementaryCharacter(), highSurrogateOfEmoji()),
+            printArgs = { "str.contains of a surrogate half inside U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringPrefixOfSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringPrefixOfNoSimplify(emoji, mkStringConcat(emoji, "a".expr)),
+            simplifiedExpr = mkStringPrefixOf(emoji, mkStringConcat(emoji, "a".expr)),
+            printArgs = { "str.prefixof of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringPrefixOfDoesNotMatchSurrogateHalf() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringPrefixOfNoSimplify(highSurrogateOfEmoji(), supplementaryCharacter()),
+            simplifiedExpr = mkStringPrefixOf(highSurrogateOfEmoji(), supplementaryCharacter()),
+            printArgs = { "str.prefixof of a surrogate half inside U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringSuffixOfSupplementaryCharacter() = runTest { _, checker ->
+        val emoji = supplementaryCharacter()
+        checker.check(
+            unsimplifiedExpr = mkStringSuffixOfNoSimplify(emoji, mkStringConcat("a".expr, emoji)),
+            simplifiedExpr = mkStringSuffixOf(emoji, mkStringConcat("a".expr, emoji)),
+            printArgs = { "str.suffixof of U+1F44D" }
+        )
+    }
+
+    @Test
+    fun testStringSuffixOfDoesNotMatchSurrogateHalf() = runTest { _, checker ->
+        checker.check(
+            unsimplifiedExpr = mkStringSuffixOfNoSimplify(lowSurrogateOfEmoji(), supplementaryCharacter()),
+            simplifiedExpr = mkStringSuffixOf(lowSurrogateOfEmoji(), supplementaryCharacter()),
+            printArgs = { "str.suffixof of a surrogate half inside U+1F44D" }
+        )
+    }
+
+    @Test
     fun testStringReverseKeepsSupplementaryCharacter() = runTest { _, checker ->
         val emoji = supplementaryCharacter()
         val text = mkStringConcat(emoji, mkStringLiteral("a"))
@@ -318,6 +497,18 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
 
     private fun KContext.supplementaryCharacter() =
         mkStringFromCode(mkIntNum(0x1F44D))
+
+    private fun KContext.lastBmpCharacter() =
+        mkStringFromCode(mkIntNum(0xFFFF))
+
+    private fun KContext.firstSupplementaryCharacter() =
+        mkStringFromCode(mkIntNum(0x10000))
+
+    private fun KContext.highSurrogateOfEmoji() =
+        mkStringFromCode(mkIntNum(0xD83D))
+
+    private fun KContext.lowSurrogateOfEmoji() =
+        mkStringFromCode(mkIntNum(0xDC4D))
 
     private fun KContext.textAroundSupplementaryCharacter() =
         mkStringConcat(mkStringConcat(mkStringLiteral("a"), supplementaryCharacter()), mkStringLiteral("b"))

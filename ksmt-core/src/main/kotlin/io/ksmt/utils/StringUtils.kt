@@ -81,7 +81,7 @@ object StringUtils {
         arg0: KStringLiteralExpr,
         arg1: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg0.ctx) {
-        mkBool(arg1.value.endsWith(arg0.value)).uncheckedCast()
+        mkBool(hasSuffixCodePoints(arg1.value, arg0.value)).uncheckedCast()
     }
 
     @JvmStatic
@@ -89,7 +89,7 @@ object StringUtils {
         arg0: KStringLiteralExpr,
         arg1: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg0.ctx) {
-        mkBool(arg1.value.startsWith(arg0.value)).uncheckedCast()
+        mkBool(hasPrefixCodePoints(arg1.value, arg0.value)).uncheckedCast()
     }
 
     @JvmStatic
@@ -97,7 +97,7 @@ object StringUtils {
         arg0: KStringLiteralExpr,
         arg1: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg0.ctx) {
-        mkBool(arg0.value < arg1.value).uncheckedCast()
+        mkBool(compareCodePoints(arg0.value, arg1.value) < 0).uncheckedCast()
     }
 
     @JvmStatic
@@ -105,7 +105,7 @@ object StringUtils {
         arg0: KStringLiteralExpr,
         arg1: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg0.ctx) {
-        mkBool(arg0.value <= arg1.value).uncheckedCast()
+        mkBool(compareCodePoints(arg0.value, arg1.value) <= 0).uncheckedCast()
     }
 
     @JvmStatic
@@ -113,7 +113,7 @@ object StringUtils {
         arg0: KStringLiteralExpr,
         arg1: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg0.ctx) {
-        mkBool(arg0.value > arg1.value).uncheckedCast()
+        mkBool(compareCodePoints(arg0.value, arg1.value) > 0).uncheckedCast()
     }
 
     @JvmStatic
@@ -121,7 +121,7 @@ object StringUtils {
         arg0: KStringLiteralExpr,
         arg1: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg0.ctx) {
-        mkBool(arg0.value >= arg1.value).uncheckedCast()
+        mkBool(compareCodePoints(arg0.value, arg1.value) >= 0).uncheckedCast()
     }
 
     @JvmStatic
@@ -129,7 +129,7 @@ object StringUtils {
         arg0: KStringLiteralExpr,
         arg1: KStringLiteralExpr
     ): KInterpretedValue<KBoolSort> = with(arg0.ctx) {
-        mkBool(arg0.value.contains(arg1.value)).uncheckedCast()
+        mkBool(containsCodePoints(arg0.value, arg1.value)).uncheckedCast()
     }
 
     @JvmStatic
@@ -203,7 +203,65 @@ object StringUtils {
         val str = arg0.value
         val search = arg1.value
         val replace = arg2.value
-        return mkStringLiteral(if (search.isEmpty()) str else str.replace(search, replace))
+        return mkStringLiteral(replaceAllCodePoints(str, search, replace))
+    }
+
+    /** Lexicographic order of Unicode code points, the shorter string first after a shared prefix. */
+    private fun compareCodePoints(left: String, right: String): Int {
+        val a = codePoints(left)
+        val b = codePoints(right)
+        val shared = minOf(a.size, b.size)
+        for (index in 0 until shared) {
+            val difference = a[index].compareTo(b[index])
+            if (difference != 0) return difference
+        }
+        return a.size.compareTo(b.size)
+    }
+
+    private fun containsCodePoints(value: String, search: String): Boolean =
+        indexOfCodePoints(value, search, 0) >= 0
+
+    private fun hasPrefixCodePoints(value: String, prefix: String): Boolean {
+        val text = codePoints(value)
+        val needle = codePoints(prefix)
+        if (needle.size > text.size) return false
+        return needle.indices.all { needle[it] == text[it] }
+    }
+
+    private fun hasSuffixCodePoints(value: String, suffix: String): Boolean {
+        val text = codePoints(value)
+        val needle = codePoints(suffix)
+        if (needle.size > text.size) return false
+        val offset = text.size - needle.size
+        return needle.indices.all { needle[it] == text[offset + it] }
+    }
+
+    /** Non-overlapping replacement by code points. An empty search leaves the string unchanged. */
+    private fun replaceAllCodePoints(value: String, search: String, replacement: String): String {
+        if (search.isEmpty()) return value
+        val text = codePoints(value)
+        val needle = codePoints(search)
+        if (needle.size > text.size) return value
+        val inserted = codePoints(replacement)
+        val out = ArrayList<Int>(text.size)
+        var index = 0
+        val last = text.size - needle.size
+        while (index <= last) {
+            val matches = needle.indices.all { needle[it] == text[index + it] }
+            if (matches) {
+                inserted.forEach { out.add(it) }
+                index += needle.size
+            } else {
+                out.add(text[index])
+                index++
+            }
+        }
+        while (index < text.size) {
+            out.add(text[index])
+            index++
+        }
+        val points = out.toIntArray()
+        return String(points, 0, points.size)
     }
 
     @JvmStatic
