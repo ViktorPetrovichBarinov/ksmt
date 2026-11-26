@@ -38,6 +38,12 @@ val usePreparedBenchmarks = project.booleanProperty("usePreparedBenchmarks") ?: 
 // skip big benchmarks to achieve faster tests build and run time
 val skipBigBenchmarks = project.booleanProperty("skipBigBenchmarks") ?: true
 
+val onlyBenchmarks = project.stringProperty("onlyBenchmarks")
+    ?.split(',')
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    ?.toSet()
+
 val smtLibBenchmarks = listOfNotNull(
     "QF_ALIA", // 12M
     "QF_AUFLIA", // 1.5M
@@ -81,7 +87,9 @@ val smtLibBenchmarks = listOfNotNull(
     "QF_ANIA", //2.1M
     "QF_AUFBV", //1.1M
     "QF_AUFNIA", //531K
-)
+    "QF_S",
+    "QF_SLIA",
+).filter { onlyBenchmarks == null || it in onlyBenchmarks }
 
 val testDataDir = projectDir.resolve("testData")
 val unpackedTestDataDir = testDataDir.resolve("data")

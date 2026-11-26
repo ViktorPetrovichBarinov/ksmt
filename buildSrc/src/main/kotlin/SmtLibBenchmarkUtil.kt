@@ -8,16 +8,14 @@ import java.io.File
 fun Project.mkSmtLibBenchmarkTestData(name: String) = tasks.register("smtLibBenchmark-$name") {
     doLast {
         val path = buildDir.resolve("smtLibBenchmark/$name")
-        val downloadTarget = path.resolve("$name.zip")
-        val url = "$BENCHMARK_REPO_URL/zip/$name.zip"
+        val downloadTarget = path.resolve("$name.tar.zst")
+        val url = "$BENCHMARK_REPO_URL/$name.tar.zst/content"
 
         download(url, downloadTarget)
 
         path.executeIfNotReady("unpack-complete") {
-            copy {
-                from(zipTree(downloadTarget))
-                into(path)
-                duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            exec {
+                commandLine("tar", "--zstd", "-xf", downloadTarget.absolutePath, "-C", path.absolutePath)
             }
         }
 
@@ -72,7 +70,7 @@ private fun Project.testResourceDir(): File? {
     return sourceSets["test"]?.output?.resourcesDir
 }
 
-private const val BENCHMARK_REPO_URL = "http://smt-lib.loria.fr"
+private const val BENCHMARK_REPO_URL = "https://zenodo.org/api/records/16740866/files"
 
 private inline fun File.executeIfNotReady(markerName: String, body: () -> Unit) {
     val marker = this.resolve(markerName)

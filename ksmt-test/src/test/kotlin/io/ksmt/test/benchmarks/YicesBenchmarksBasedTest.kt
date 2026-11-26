@@ -34,7 +34,7 @@ class YicesBenchmarksBasedTest : BenchmarksBasedTest() {
         fun yicesTestData() = testData { skipUnsupportedTheories(it) && skipBadTestCases(it) }
 
         private fun skipUnsupportedTheories(name: String): Boolean =
-            "QF" in name && "FP" !in name && "N" !in name
+            "QF" in name && "FP" !in name && "N" !in name && "QF_S" !in name
 
         private fun skipBadTestCases(name: String): Boolean {
             // Yices bug: returns an incorrect model

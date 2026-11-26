@@ -369,6 +369,25 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
         checkFromCodeMatchesSolver(STRING_FROM_CODE_UPPER_BOUND + 1)
 
     @Test
+    fun testStringFromCodeTwoToThe64() = runTest { _, _ ->
+        val folded = mkStringFromCode(mkIntNum(TWO_TO_THE_64))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.from_code(2^64)")
+    }
+
+    @Test
+    fun testStringFromCodeNegativeTwoToThe64() = runTest { _, _ ->
+        val folded = mkStringFromCode(mkIntNum(TWO_TO_THE_64.negate()))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.from_code(-(2^64))")
+    }
+
+    @Test
+    fun testStringFromCodeTwoToThe64PlusLetter() = runTest { _, _ ->
+        val code = TWO_TO_THE_64.add(BigInteger.valueOf('A'.code.toLong()))
+        val folded = mkStringFromCode(mkIntNum(code))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.from_code(2^64 + code of A)")
+    }
+
+    @Test
     fun testStringLenOfSupplementaryCharacter() = runTest { _, checker ->
         val emoji = supplementaryCharacter()
         checker.check(
@@ -435,6 +454,48 @@ class StringSimplifyTest: ExpressionSimplifyTest() {
     fun testStringIndexOfEmptySearchAtLength() = runTest { _, _ ->
         val folded = mkStringIndexOf("ab".expr, "".expr, mkIntNum(2))
         kotlin.test.assertSame(mkIntNum(2), folded, "str.indexof of the empty string at the length")
+    }
+
+    @Test
+    fun testStringAtTwoToThe64() = runTest { _, _ ->
+        val folded = mkStringSingletonSub("abc".expr, mkIntNum(TWO_TO_THE_64))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.at with index 2^64")
+    }
+
+    @Test
+    fun testStringAtTwoToThe64PlusOne() = runTest { _, _ ->
+        val folded = mkStringSingletonSub("abc".expr, mkIntNum(TWO_TO_THE_64.add(BigInteger.ONE)))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.at with index 2^64 + 1")
+    }
+
+    @Test
+    fun testStringAtNegativeTwoToThe64() = runTest { _, _ ->
+        val folded = mkStringSingletonSub("abc".expr, mkIntNum(TWO_TO_THE_64.negate()))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.at with index -(2^64)")
+    }
+
+    @Test
+    fun testStringSubStartTwoToThe64() = runTest { _, _ ->
+        val folded = mkStringSub("abc".expr, mkIntNum(TWO_TO_THE_64), mkIntNum(1))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.substr with start 2^64")
+    }
+
+    @Test
+    fun testStringSubStartNegativeTwoToThe64() = runTest { _, _ ->
+        val folded = mkStringSub("abc".expr, mkIntNum(TWO_TO_THE_64.negate()), mkIntNum(1))
+        kotlin.test.assertSame(mkStringLiteral(""), folded, "str.substr with start -(2^64)")
+    }
+
+    @Test
+    fun testStringSubLengthTwoToThe64() = runTest { _, _ ->
+        val folded = mkStringSub("abc".expr, mkIntNum(0), mkIntNum(TWO_TO_THE_64))
+        kotlin.test.assertSame("abc".expr, folded, "str.substr with length 2^64")
+    }
+
+    @Test
+    fun testStringSubLengthPastIntMax() = runTest { _, _ ->
+        val folded = mkStringSub("abc".expr, mkIntNum(1), mkIntNum(1L shl 31))
+        kotlin.test.assertSame("bc".expr, folded, "str.substr with length past Int.MAX_VALUE")
     }
 
     @Test

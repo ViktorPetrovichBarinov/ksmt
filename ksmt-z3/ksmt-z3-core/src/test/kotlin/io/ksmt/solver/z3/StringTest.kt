@@ -56,7 +56,13 @@ class StringTest {
             mkRegexUnionNoSimplify(pattern, mkRegexEpsilon()),
             mkRegexIntersectionNoSimplify(pattern, mkRegexAll()),
             mkRegexStarNoSimplify(pattern),
-            mkRegexRangeNoSimplify(left, right)
+            mkRegexCrossNoSimplify(pattern),
+            mkRegexDifferenceNoSimplify(pattern, mkRegexEpsilon()),
+            mkRegexComplementNoSimplify(pattern),
+            mkRegexOptionNoSimplify(pattern),
+            mkRegexRangeNoSimplify(left, right),
+            mkRegexPowerNoSimplify(2, pattern),
+            mkRegexLoopNoSimplify(1, 3, pattern)
         ).forEach { expr ->
             assertRoundTrip(expr, expr::class.simpleName ?: "expression")
         }
@@ -153,7 +159,7 @@ class StringTest {
             val nativePatterns = LongArray(count) { native(patterns[it]) }
 
             check(
-                strings.reduceRight { left, right -> mkStringConcatNoSimplify(left, right) },
+                strings.reduce { left, right -> mkStringConcatNoSimplify(left, right) },
                 Native.mkSeqConcat(internalizer.nCtx, count, nativeStrings),
                 "concat"
             )

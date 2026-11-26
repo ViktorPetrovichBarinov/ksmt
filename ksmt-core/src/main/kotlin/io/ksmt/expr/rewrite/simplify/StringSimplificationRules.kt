@@ -4,9 +4,6 @@ import io.ksmt.KContext
 import io.ksmt.expr.KStringConcatExpr
 import io.ksmt.expr.KStringLiteralExpr
 import io.ksmt.expr.KIntNumExpr
-import io.ksmt.expr.KInt32NumExpr
-import io.ksmt.expr.KInt64NumExpr
-import io.ksmt.expr.KIntBigNumExpr
 import io.ksmt.expr.KInterpretedValue
 import io.ksmt.expr.KExpr
 import io.ksmt.sort.KBoolSort
@@ -189,23 +186,14 @@ inline fun KContext.simplifyStringSingletonSubBasic(
     arg1: KExpr<KIntSort>,
     cont: (KExpr<KStringSort>, KExpr<KIntSort>) -> KExpr<KStringSort>
 ): KExpr<KStringSort> {
-    return if (arg0 is KStringLiteralExpr && arg1 is KIntNumExpr) {
-        val str = arg0.value
-        val pos = when (arg1) {
-            is KInt32NumExpr -> arg1.value.toLong()
-            is KInt64NumExpr -> arg1.value
-            is KIntBigNumExpr -> arg1.value.toLong()
-            else -> return cont(arg0, arg1)
-        }
-        val result = if (pos in 0..Int.MAX_VALUE) {
-            StringUtils.charAtCodePoint(str, pos.toInt())
-        } else {
-            ""
-        }
-        mkStringLiteral(result)
+    if (arg0 !is KStringLiteralExpr || arg1 !is KIntNumExpr) return cont(arg0, arg1)
+    val index = arg1.bigIntegerValue
+    val result = if (index.signum() >= 0 && index <= BigInteger.valueOf(Int.MAX_VALUE.toLong())) {
+        StringUtils.charAtCodePoint(arg0.value, index.intValueExact())
     } else {
-        cont(arg0, arg1)
+        ""
     }
+    return mkStringLiteral(result)
 }
 
 /** Eval constants. */
@@ -215,19 +203,21 @@ inline fun KContext.simplifyStringSubBasic(
     arg2: KExpr<KIntSort>,
     cont: (KExpr<KStringSort>, KExpr<KIntSort>, KExpr<KIntSort>) -> KExpr<KStringSort>
 ): KExpr<KStringSort> {
-    return if (arg0 is KStringLiteralExpr && arg1 is KIntNumExpr && arg2 is KIntNumExpr) {
-        val str = arg0.value
-        val startPos = arg1.toLongValue()
-        val length = arg2.toLongValue()
-        val result = if (startPos in 0..Int.MAX_VALUE && length in 0..Int.MAX_VALUE) {
-            StringUtils.substringByCodePoints(str, startPos.toInt(), length.toInt())
-        } else {
-            ""
-        }
-        mkStringLiteral(result)
-    } else {
-        cont(arg0, arg1, arg2)
+    if (arg0 !is KStringLiteralExpr || arg1 !is KIntNumExpr || arg2 !is KIntNumExpr) {
+        return cont(arg0, arg1, arg2)
     }
+    val start = arg1.bigIntegerValue
+    val length = arg2.bigIntegerValue
+    val result = when {
+        start.signum() < 0 || length.signum() < 0 -> ""
+        start > BigInteger.valueOf(Int.MAX_VALUE.toLong()) -> ""
+        else -> StringUtils.substringByCodePoints(
+            arg0.value,
+            start.intValueExact(),
+            length.min(BigInteger.valueOf(Int.MAX_VALUE.toLong())).intValueExact()
+        )
+    }
+    return mkStringLiteral(result)
 }
 
 /** Eval constants. */
@@ -340,15 +330,10 @@ inline fun KContext.simplifyStringFromCodeBasic(
     arg: KExpr<KIntSort>,
     cont: (KExpr<KIntSort>) -> KExpr<KStringSort>
 ): KExpr<KStringSort> {
-    val value = when (arg) {
-        is KInt32NumExpr -> arg.value.toLong()
-        is KInt64NumExpr -> arg.value
-        is KIntBigNumExpr -> arg.value.toLong()
-        else -> return cont(arg)
-    }
-
-    return if (value in 0..STRING_FROM_CODE_UPPER_BOUND) {
-        mkStringLiteral(StringUtils.codePointToString(value.toInt()))
+    val code = (arg as? KIntNumExpr)?.bigIntegerValue ?: return cont(arg)
+    val upperBound = BigInteger.valueOf(STRING_FROM_CODE_UPPER_BOUND.toLong())
+    return if (code.signum() >= 0 && code <= upperBound) {
+        mkStringLiteral(StringUtils.codePointToString(code.intValueExact()))
     } else {
         mkStringLiteral("")
     }
@@ -407,11 +392,4 @@ inline fun <K: KSort> tryEvalStringLiteralOperation(
     operation(arg0, arg1, arg2)
 } else {
     cont()
-}
-
-fun KIntNumExpr.toLongValue(): Long = when (this) {
-    is KInt32NumExpr -> value.toLong()
-    is KInt64NumExpr -> value
-    is KIntBigNumExpr -> value.toLong()
-    else -> throw IllegalArgumentException("Unsupported KIntNumExpr type: ${this::class}")
 }

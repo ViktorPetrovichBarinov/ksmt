@@ -24,6 +24,34 @@ class StringSmtLibSampleTest {
     }
 
     @Test
+    fun testZ3AndCvc5AgreeOnIsDigit() = with(
+        KContext(simplificationMode = KContext.SimplificationMode.NO_SIMPLIFY)
+    ) {
+        listOf(
+            mkStringIsDigitNoSimplify(mkStringLiteral("5")) to KSolverStatus.SAT,
+            mkStringIsDigitNoSimplify(mkStringLiteral("0")) to KSolverStatus.SAT,
+            mkStringIsDigitNoSimplify(mkStringLiteral("ab")) to KSolverStatus.UNSAT,
+            mkStringIsDigitNoSimplify(mkStringLiteral("")) to KSolverStatus.UNSAT,
+            mkStringIsDigitNoSimplify(mkStringLiteral("a")) to KSolverStatus.UNSAT
+        ).forEach { (expr, expected) ->
+            val z3 = check(KZ3Solver(this), listOf(expr))
+            val cvc5 = check(KCvc5Solver(this), listOf(expr))
+            assertEquals(expected, z3, expr.toString())
+            assertEquals(z3, cvc5, expr.toString())
+        }
+
+        val text = mkConst("s", stringSort)
+        val constrained = mkAnd(
+            mkStringIsDigitNoSimplify(text),
+            text eq mkStringLiteral("5")
+        )
+        val z3 = check(KZ3Solver(this), listOf(constrained))
+        val cvc5 = check(KCvc5Solver(this), listOf(constrained))
+        assertEquals(KSolverStatus.SAT, z3, constrained.toString())
+        assertEquals(z3, cvc5, constrained.toString())
+    }
+
+    @Test
     fun testBitwuzlaAndYicesRejectTheSample() = with(KContext()) {
         val assertions = KZ3SMTLibParser(this).parse(satSample)
         listOf(

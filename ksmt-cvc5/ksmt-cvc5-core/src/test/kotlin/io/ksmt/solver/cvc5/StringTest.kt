@@ -39,6 +39,7 @@ class StringTest {
             mkStringSingletonSubNoSimplify(left, index),
             mkStringSubNoSimplify(left, index, length),
             mkStringIndexOfNoSimplify(left, right, index),
+            mkStringIndexOfRegexNoSimplify(left, pattern, index),
             mkStringReplaceNoSimplify(left, right, mkConst("u", stringSort)),
             mkStringReplaceAllNoSimplify(left, right, mkConst("u", stringSort)),
             mkStringReplaceWithRegexNoSimplify(left, pattern, mkConst("u", stringSort)),
@@ -48,13 +49,22 @@ class StringTest {
             mkStringFromCodeNoSimplify(index),
             mkStringToIntNoSimplify(left),
             mkStringFromIntNoSimplify(index),
+            mkStringToLowerNoSimplify(left),
+            mkStringToUpperNoSimplify(left),
+            mkStringReverseNoSimplify(left),
             mkStringToRegexNoSimplify(left),
             mkStringInRegexNoSimplify(left, pattern),
             mkRegexConcatNoSimplify(pattern, mkRegexAllChar()),
             mkRegexUnionNoSimplify(pattern, mkRegexEpsilon()),
             mkRegexIntersectionNoSimplify(pattern, mkRegexAll()),
             mkRegexStarNoSimplify(pattern),
-            mkRegexRangeNoSimplify(left, right)
+            mkRegexCrossNoSimplify(pattern),
+            mkRegexDifferenceNoSimplify(pattern, mkRegexEpsilon()),
+            mkRegexComplementNoSimplify(pattern),
+            mkRegexOptionNoSimplify(pattern),
+            mkRegexRangeNoSimplify(left, right),
+            mkRegexPowerNoSimplify(2, pattern),
+            mkRegexLoopNoSimplify(1, 3, pattern)
         ).forEach { expr ->
             assertRoundTrip(expr, expr::class.simpleName ?: "expression")
         }

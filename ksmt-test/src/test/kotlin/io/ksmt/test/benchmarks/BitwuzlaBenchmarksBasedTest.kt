@@ -45,6 +45,7 @@ class BitwuzlaBenchmarksBasedTest : BenchmarksBasedTest() {
         private fun skipUnsupportedTheories(name: String): Boolean {
             if ("LIA" in name || "LRA" in name || "LIRA" in name) return false
             if ("NIA" in name || "NRA" in name || "NIRA" in name) return false
+            if ("QF_S" in name) return false
             return true
         }
     }
