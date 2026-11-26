@@ -10,6 +10,17 @@ object StringUtils {
 
     const val STRING_FROM_CODE_UPPER_BOUND: Int = 196607
 
+    /** First printable ASCII code point: space. */
+    private const val PRINTABLE_ASCII_FIRST: Int = 0x20
+
+    /** Last printable ASCII code point: tilde. */
+    private const val PRINTABLE_ASCII_LAST: Int = 0x7E
+
+    private const val HEXADECIMAL_RADIX: Int = 16
+
+    /** Distance from an uppercase ASCII letter to its lowercase counterpart. */
+    private const val ASCII_CASE_OFFSET: Int = 32
+
     /** Singleton string for an SMT-LIB code point. Codes above U+FFFF need a surrogate pair. */
     @JvmStatic
     fun codePointToString(codePoint: Int): String =
@@ -240,13 +251,13 @@ object StringUtils {
     @JvmStatic
     fun smtLibStringBody(value: String): String = buildString {
         for (codePoint in codePoints(value)) {
-            val printableAscii = codePoint in 0x20..0x7E &&
+            val printableAscii = codePoint in PRINTABLE_ASCII_FIRST..PRINTABLE_ASCII_LAST &&
                 codePoint != '"'.code &&
                 codePoint != '\\'.code
             if (printableAscii) {
                 append(codePoint.toChar())
             } else {
-                append("\\u{").append(codePoint.toString(16)).append('}')
+                append("\\u{").append(codePoint.toString(HEXADECIMAL_RADIX)).append('}')
             }
         }
     }
@@ -257,8 +268,8 @@ object StringUtils {
         for (index in points.indices) {
             val code = points[index]
             points[index] = when {
-                !upper && code in 'A'.code..'Z'.code -> code + 32
-                upper && code in 'a'.code..'z'.code -> code - 32
+                !upper && code in 'A'.code..'Z'.code -> code + ASCII_CASE_OFFSET
+                upper && code in 'a'.code..'z'.code -> code - ASCII_CASE_OFFSET
                 else -> code
             }
         }
