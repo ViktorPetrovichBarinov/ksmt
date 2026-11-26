@@ -108,6 +108,11 @@ val prepareTestData by tasks.registering {
 }
 
 val testDataRevision = project.stringProperty("testDataRevision") ?: "no-revision"
+val downloadStringBenchmarksTestData = downloadStringSmtLibBenchmarkTestData(
+    downloadPath = downloadedTestData,
+    testDataPath = unpackedTestDataDir,
+)
+
 val downloadPreparedBenchmarksTestData = downloadPreparedSmtLibBenchmarkTestData(
     downloadPath = downloadedTestData,
     testDataPath = unpackedTestDataDir,

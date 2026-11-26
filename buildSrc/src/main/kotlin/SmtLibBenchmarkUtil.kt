@@ -4,6 +4,8 @@ import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.kotlin.dsl.get
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 fun Project.mkSmtLibBenchmarkTestData(name: String) = tasks.register("smtLibBenchmark-$name") {
     doLast {
@@ -49,6 +51,56 @@ fun Project.usePreparedSmtLibBenchmarkTestData(path: File) = tasks.register("smt
         }
     }
 }
+
+/**
+ * Flat QF_S archive for the long string-theory runs.
+ * Duplicate basenames are dropped, matching [mkSmtLibBenchmarkTestData].
+ * The resulting zip is what CI caches; a later unpack only reads that zip.
+ */
+fun Project.downloadStringSmtLibBenchmarkTestData(downloadPath: File, testDataPath: File) =
+    tasks.register("downloadStringSmtLibBenchmarkTestData") {
+        doLast {
+            if (!downloadPath.exists()) {
+                val name = "QF_S"
+                val path = buildDir.resolve("smtLibBenchmark/$name")
+                path.mkdirs()
+                val archive = path.resolve("$name.tar.zst")
+                download("$BENCHMARK_REPO_URL/$name.tar.zst/content", archive)
+
+                path.executeIfNotReady("unpack-complete") {
+                    exec {
+                        commandLine("tar", "--zstd", "-xf", archive.absolutePath, "-C", path.absolutePath)
+                    }
+                }
+
+                val partial = File("${downloadPath.absolutePath}.partial")
+                if (partial.exists()) partial.delete()
+                downloadPath.parentFile.mkdirs()
+                ZipOutputStream(partial.outputStream().buffered()).use { zip ->
+                    val seen = mutableSetOf<String>()
+                    path.walkTopDown()
+                        .filter { it.isFile && it.extension == "smt2" }
+                        .forEach { file ->
+                            val entryName = "${name}_${file.name}"
+                            if (!seen.add(entryName)) return@forEach
+                            zip.putNextEntry(ZipEntry(entryName))
+                            file.inputStream().buffered().use { it.copyTo(zip) }
+                            zip.closeEntry()
+                        }
+                }
+                check(partial.renameTo(downloadPath)) {
+                    "Failed to publish string benchmark archive to ${downloadPath.absolutePath}"
+                }
+            }
+
+            testDataPath.mkdirs()
+            copy {
+                from(zipTree(downloadPath))
+                into(testDataPath)
+                duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            }
+        }
+    }
 
 fun Project.downloadPreparedSmtLibBenchmarkTestData(downloadPath: File, testDataPath: File, version: String) =
     tasks.register("downloadPreparedSmtLibBenchmarkTestData") {
