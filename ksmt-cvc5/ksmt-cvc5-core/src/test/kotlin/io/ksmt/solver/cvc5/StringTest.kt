@@ -177,6 +177,12 @@ class StringTest {
         private fun literals(): List<String> = listOf(
             "hello",
             "",
+            "\n",
+            "\t",
+            "\u007F",
+            "a\nb",
+            "\"",
+            "\\",
             "\u0000",
             String(Character.toChars(0xD800)),
             String(Character.toChars(0xFFFF)),

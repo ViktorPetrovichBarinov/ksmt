@@ -1339,8 +1339,9 @@ class KCvc5ExprInternalizer(
             // TermManager.mkString(String) passes the Java string through JNI.
             // That encoding drops U+0000 and splits a supplementary character.
             // The int[] overload is missing from the shipped native library.
+            // A raw control character, quote, or backslash makes cvc5 abort in JNI.
             tm.builder {
-                if (value.all { it.code in 1..127 }) {
+                if (value.all { isRawCvc5StringChar(it.code) }) {
                     mkString(value)
                 } else {
                     mkString(escapeCodePoints(value), true)
@@ -1351,8 +1352,7 @@ class KCvc5ExprInternalizer(
 
     private fun escapeCodePoints(value: String): String = buildString {
         for (codePoint in StringUtils.codePoints(value)) {
-            val printableAscii = codePoint in 0x20..0x7E && codePoint != '"'.code && codePoint != '\\'.code
-            if (printableAscii) {
+            if (isRawCvc5StringChar(codePoint)) {
                 append(codePoint.toChar())
             } else {
                 append("\\u{")
@@ -1361,6 +1361,9 @@ class KCvc5ExprInternalizer(
             }
         }
     }
+
+    private fun isRawCvc5StringChar(code: Int): Boolean =
+        code in 0x20..0x7E && code != '"'.code && code != '\\'.code
 
     // regex
     override fun transform(expr: KRegexConcatExpr) = with(expr) {
