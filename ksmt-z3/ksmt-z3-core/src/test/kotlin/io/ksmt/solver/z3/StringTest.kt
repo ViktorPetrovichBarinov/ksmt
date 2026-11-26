@@ -103,6 +103,29 @@ class StringTest {
     }
 
     @Test
+    fun testZeroLoopMatchesOnlyTheEmptyString() = with(context()) {
+        val digits = mkRegexRangeNoSimplify(mkStringLiteral("0"), mkStringLiteral("9"))
+        val loop = mkRegexLoopNoSimplify(0, 0, digits)
+        val empty = mkStringToRegexNoSimplify(mkStringLiteral(""))
+
+        KZ3Solver(this).use { solver ->
+            solver.assert(loop neq empty)
+            assertEquals(KSolverStatus.UNSAT, solver.check())
+        }
+    }
+
+    @Test
+    fun testLoopAboveItsUpperBoundMatchesNothing() = with(context()) {
+        val digits = mkRegexRangeNoSimplify(mkStringLiteral("0"), mkStringLiteral("9"))
+        val loop = mkRegexLoopNoSimplify(1, 0, digits)
+
+        KZ3Solver(this).use { solver ->
+            solver.assert(mkStringInRegexNoSimplify(mkStringLiteral("7"), loop))
+            assertEquals(KSolverStatus.UNSAT, solver.check())
+        }
+    }
+
+    @Test
     fun testPrintedLiteralParsesBack() = with(context()) {
         listOf(
             "\"",

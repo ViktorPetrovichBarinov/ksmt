@@ -1105,19 +1105,20 @@ open class KZ3ExprInternalizer(
 
     override fun transform(expr: KRegexLoopExpr) = with(expr) {
         transform(arg) { arg ->
-            Native.mkReLoop(nCtx, arg, from, to)
+            when {
+                // Z3_mk_re_loop treats an upper bound of 0 as "no upper bound".
+                // ((_ re.loop 0 0) R) is ((_ re.^ 0) R): only the empty string.
+                // ((_ re.loop n 0) R) with n > 0 is re.none.
+                to == 0 && from == 0 -> Native.mkRePower(nCtx, arg, 0)
+                to == 0 -> mkEmptyRegex()
+                else -> Native.mkReLoop(nCtx, arg, from, to)
+            }
         }
     }
 
     override fun transform(expr: KRegexEpsilon) = with(expr) {
         transform {
-            Native.mkReEmpty(
-                nCtx,
-                Native.mkReSort(
-                    nCtx,
-                    Native.mkStringSort(nCtx)
-                )
-            )
+            mkEmptyRegex()
         }
     }
 
@@ -1144,6 +1145,15 @@ open class KZ3ExprInternalizer(
             )
         }
     }
+
+    private fun mkEmptyRegex(): Long =
+        Native.mkReEmpty(
+            nCtx,
+            Native.mkReSort(
+                nCtx,
+                Native.mkStringSort(nCtx)
+            )
+        )
 
     private fun transformQuantifier(expr: KQuantifier, isUniversal: Boolean) = with(expr) {
         val boundConstants = bounds.map { ctx.mkConstApp(it) }
